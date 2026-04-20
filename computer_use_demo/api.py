@@ -42,6 +42,7 @@ class MessageRequest(BaseModel):
 # Session lifecycle
 # ---------------------------------------------------------------------------
 
+
 @app.post("/sessions")
 async def create_session(db: AsyncSession = Depends(get_db)):
     session_id = uuid.uuid4().hex
@@ -67,9 +68,7 @@ async def list_sessions(db: AsyncSession = Depends(get_db)):
 
 @app.get("/sessions/{session_id}")
 async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(AgentSession).where(AgentSession.id == session_id)
-    )
+    result = await db.execute(select(AgentSession).where(AgentSession.id == session_id))
     sess = result.scalar_one_or_none()
     if sess:
         return sess.to_dict()
@@ -79,9 +78,7 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
 @app.delete("/sessions/{session_id}")
 async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
     await session_manager.cleanup_session(session_id)
-    result = await db.execute(
-        select(AgentSession).where(AgentSession.id == session_id)
-    )
+    result = await db.execute(select(AgentSession).where(AgentSession.id == session_id))
     sess = result.scalar_one_or_none()
     if sess:
         sess.status = "stopped"
@@ -93,6 +90,7 @@ async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
 # Chat history
 # ---------------------------------------------------------------------------
 
+
 @app.get("/sessions/{session_id}/messages")
 async def get_messages(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -101,14 +99,14 @@ async def get_messages(session_id: str, db: AsyncSession = Depends(get_db)):
         .order_by(AgentMessage.id.asc())
     )
     return [
-        {"role": m.role, "content": m.get_content()}
-        for m in result.scalars().all()
+        {"role": m.role, "content": m.get_content()} for m in result.scalars().all()
     ]
 
 
 # ---------------------------------------------------------------------------
 # Sending a message → triggers the agent runner
 # ---------------------------------------------------------------------------
+
 
 @app.post("/sessions/{session_id}/message")
 async def send_message(
@@ -127,9 +125,7 @@ async def send_message(
     await db.commit()
 
     # 2. Pull session env
-    result = await db.execute(
-        select(AgentSession).where(AgentSession.id == session_id)
-    )
+    result = await db.execute(select(AgentSession).where(AgentSession.id == session_id))
     sess = result.scalar_one_or_none()
     if not sess:
         return JSONResponse(status_code=404, content={"error": "Session not found"})
@@ -137,8 +133,11 @@ async def send_message(
     env = os.environ.copy()
     env["DISPLAY_NUM"] = str(sess.display_num)
     env["DISPLAY"] = f":{sess.display_num}"
-    env["WIDTH"] = "1024"
-    env["HEIGHT"] = "768"
+    env["WIDTH"] = os.environ.get("WIDTH", "1024")
+    env["HEIGHT"] = os.environ.get("HEIGHT", "768")
+    # Always forward the API key explicitly so the subprocess has it
+    if "ANTHROPIC_API_KEY" not in env:
+        env["ANTHROPIC_API_KEY"] = ""
 
     # 3. Spawn runner as a background task so the HTTP response returns immediately
     asyncio.create_task(_run_agent(session_id, env))
@@ -150,16 +149,24 @@ async def _run_agent(session_id: str, env: dict):
     """Spawn runner.py in a subprocess, forward its JSON-line output to the session queue."""
     queue = session_manager.get_queue(session_id)
 
-    await queue.put(json.dumps({
-        "type": "status",
-        "data": {"message": f"Agent starting for session {session_id[:8]}…"},
-    }))
+    await queue.put(
+        json.dumps(
+            {
+                "type": "status",
+                "data": {"message": f"Agent starting for session {session_id[:8]}…"},
+            }
+        )
+    )
 
     process = await asyncio.create_subprocess_exec(
-        "python", "-m", "computer_use_demo.runner", session_id,
+        "python",
+        "-m",
+        "computer_use_demo.runner",
+        session_id,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
+        limit=10 * 1024 * 1024,  # 10 MB — screenshots are large base64 blobs
     )
 
     async def _forward(stream):
@@ -171,10 +178,14 @@ async def _run_agent(session_id: str, env: dict):
     await asyncio.gather(_forward(process.stdout), _forward(process.stderr))
     await process.wait()
 
-    await queue.put(json.dumps({
-        "type": "status",
-        "data": {"message": "Agent finished."},
-    }))
+    await queue.put(
+        json.dumps(
+            {
+                "type": "status",
+                "data": {"message": "Agent finished."},
+            }
+        )
+    )
     # Sentinel so the SSE generator knows the run is done
     await queue.put(None)
 
@@ -182,6 +193,7 @@ async def _run_agent(session_id: str, env: dict):
 # ---------------------------------------------------------------------------
 # SSE stream – passive: just drains the session queue
 # ---------------------------------------------------------------------------
+
 
 @app.get("/sessions/{session_id}/stream")
 async def stream_session(session_id: str):

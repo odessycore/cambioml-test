@@ -41,7 +41,11 @@ class SessionManager:
 
         # Start Xvfb
         xvfb = await asyncio.create_subprocess_exec(
-            "Xvfb", f":{display_num}", "-screen", "0", "1024x768x24",
+            "Xvfb",
+            f":{display_num}",
+            "-screen",
+            "0",
+            "1024x768x24",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -52,7 +56,9 @@ class SessionManager:
 
         # Start window manager
         mutter = await asyncio.create_subprocess_exec(
-            "mutter", "--x11", f"--display=:{display_num}",
+            "mutter",
+            "--x11",
+            f"--display=:{display_num}",
             env=env,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
@@ -61,7 +67,9 @@ class SessionManager:
 
         # Start taskbar
         tint2 = await asyncio.create_subprocess_exec(
-            "tint2", "-c", os.path.expanduser("~/.config/tint2/tint2rc"),
+            "tint2",
+            "-c",
+            os.path.expanduser("~/.config/tint2/tint2rc"),
             env=env,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
@@ -72,9 +80,13 @@ class SessionManager:
         await asyncio.sleep(0.5)
         vnc = await asyncio.create_subprocess_exec(
             "x11vnc",
-            "-display", f":{display_num}",
-            "-rfbport", str(vnc_port),
-            "-forever", "-shared", "-nopw",
+            "-display",
+            f":{display_num}",
+            "-rfbport",
+            str(vnc_port),
+            "-forever",
+            "-shared",
+            "-nopw",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -86,9 +98,12 @@ class SessionManager:
         # Start noVNC (serves HTML client + websocket proxy on novnc_port)
         novnc = await asyncio.create_subprocess_exec(
             "/opt/noVNC/utils/novnc_proxy",
-            "--vnc", f"localhost:{vnc_port}",
-            "--listen", str(novnc_port),
-            "--web", "/opt/noVNC",
+            "--vnc",
+            f"localhost:{vnc_port}",
+            "--listen",
+            str(novnc_port),
+            "--web",
+            "/opt/noVNC",
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )

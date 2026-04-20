@@ -1,4 +1,9 @@
-const API_URL = 'http://localhost:8080';
+// Use the same host the user loaded the frontend from.
+// This fixes "localhost" issues when accessing the UI remotely (e.g. VM/hosted box),
+// where `localhost` would otherwise point at the *viewer’s* machine.
+const HOST = window.location.hostname;
+const PROTO = window.location.protocol; // "http:" or "https:"
+const API_URL = `${PROTO}//${HOST}:8080`;
 
 let activeSessionId = null;
 let eventSource = null;
@@ -98,7 +103,7 @@ async function loadSession(sessionId, novncPort) {
     // Load VNC iframe — novnc_proxy serves the full HTML + WS on the same port
     elements.vncContainer.innerHTML = '';
     const iframe = document.createElement('iframe');
-    iframe.src = `http://localhost:${novncPort}/vnc.html?autoconnect=true&reconnect=true&resize=scale`;
+    iframe.src = `${PROTO}//${HOST}:${novncPort}/vnc.html?autoconnect=true&reconnect=true&resize=scale`;
     iframe.className = 'w-full h-full border-none bg-black';
     elements.vncContainer.appendChild(iframe);
 

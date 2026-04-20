@@ -1,5 +1,6 @@
-# Setup
+Author: Ahmed Sadaqat
 
+# Setup
 ```bash
 cd /home/dev/development/combioml-test
 

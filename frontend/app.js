@@ -94,31 +94,30 @@ async function loadSession(sessionId, novncPort) {
     elements.taskInput.disabled = false;
     elements.sendBtn.disabled = false;
     elements.activeSessionBar.classList.remove('hidden');
-    
-    // Load VNC iframe
+
+    // Load VNC iframe — novnc_proxy serves the full HTML + WS on the same port
     elements.vncContainer.innerHTML = '';
     const iframe = document.createElement('iframe');
-    iframe.src = `http://localhost:${novncPort}/vnc.html?autoconnect=true`;
-    iframe.className = 'w-full h-full border-none rounded shadow-2xl bg-black';
+    iframe.src = `http://localhost:${novncPort}/vnc.html?autoconnect=true&reconnect=true&resize=scale`;
+    iframe.className = 'w-full h-full border-none bg-black';
     elements.vncContainer.appendChild(iframe);
-    
+
     // Load history
     elements.chatHistory.innerHTML = '';
     try {
         const res = await fetch(`${API_URL}/sessions/${sessionId}/messages`);
         const messages = await res.json();
         messages.forEach(m => {
-            if (m.content) {
-                // simple parse logic for array of text blocks
-                const txt = (typeof m.content === 'object' && m.content[0] && m.content[0].text) 
-                            ? m.content[0].text : JSON.stringify(m.content);
-                addChatMessage(m.role, txt);
-            }
+            const content = m.content;
+            const txt = Array.isArray(content) && content[0]?.text
+                ? content[0].text
+                : (typeof content === 'string' ? content : JSON.stringify(content));
+            addChatMessage(m.role, txt);
         });
     } catch(e) {
         console.error("Failed to load history", e);
     }
-    
+
     connectStream(sessionId);
     fetchSessions(); // re-render sidebar
 }

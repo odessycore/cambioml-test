@@ -13,12 +13,14 @@ from sqlalchemy.future import select
 from sse_starlette.sse import EventSourceResponse
 
 from computer_use_demo.database import get_db, init_db
+from computer_use_demo.env import load_env
 from computer_use_demo.models import AgentMessage, AgentSession
 from computer_use_demo.session_manager import session_manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_env()
     await init_db()
     yield
 
@@ -135,9 +137,8 @@ async def send_message(
     env["DISPLAY"] = f":{sess.display_num}"
     env["WIDTH"] = os.environ.get("WIDTH", "1024")
     env["HEIGHT"] = os.environ.get("HEIGHT", "768")
-    # Always forward the API key explicitly so the subprocess has it
-    if "ANTHROPIC_API_KEY" not in env:
-        env["ANTHROPIC_API_KEY"] = ""
+    # Always forward the API key explicitly so the subprocess has it (including .env-loaded values)
+    env["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY", "")
 
     # 3. Spawn runner as a background task so the HTTP response returns immediately
     asyncio.create_task(_run_agent(session_id, env))

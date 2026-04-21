@@ -10,6 +10,7 @@ import os
 import sys
 
 from computer_use_demo.loop import APIProvider, sampling_loop
+from computer_use_demo.env import load_env
 from computer_use_demo.tools import ToolResult, ToolVersion
 from computer_use_demo.models import AgentMessage
 from computer_use_demo.database import AsyncSessionLocal
@@ -50,6 +51,7 @@ async def save_new_messages(session_id: str, messages: list[dict], original_len:
 
 
 async def run(session_id: str):
+    load_env()
     # ── Configuration (mirrors Streamlit defaults) ─────────────────────────
     api_key   = os.environ.get("ANTHROPIC_API_KEY", "")
     model     = os.environ.get("MODEL", "claude-sonnet-4-5-20250929")

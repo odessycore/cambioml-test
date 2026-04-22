@@ -16,14 +16,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    user: "0:0"
     environment:
       - DATABASE_URL=postgresql+asyncpg://user:password@db/computer_use
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     ports:
       - "8080:8080"
-      - "6080-6089:6080-6089"
     volumes:
-      - .:/home/computeruse/app
+      - ./computer_use_demo:/home/computeruse/computer_use_demo
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - db
     privileged: true # Required for some X11/mutter/virtual display components

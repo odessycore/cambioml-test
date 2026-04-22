@@ -10,8 +10,11 @@ class AgentSession(Base):
     __tablename__ = "sessions"
 
     id = Column(String, primary_key=True, index=True)
-    display_num = Column(Integer, nullable=False)
+    # Legacy column from the single-container/multi-display implementation.
+    # We keep it to avoid breaking existing DBs; session containers always use DISPLAY_NUM=1.
+    display_num = Column(Integer, nullable=False, default=1)
     novnc_port = Column(Integer, nullable=False)
+    container_id = Column(String, nullable=False)
     status = Column(String, default="running")
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -20,6 +23,7 @@ class AgentSession(Base):
             "id": self.id,
             "display_num": self.display_num,
             "novnc_port": self.novnc_port,
+            "container_id": self.container_id,
             "status": self.status,
             "created_at": self.created_at.isoformat()
         }

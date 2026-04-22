@@ -18,7 +18,8 @@ http://localhost:3000
 http://localhost:8080
 
 # noVNC (per session)
-http://localhost:6080/vnc.html
+# Each session starts its own desktop container; the backend returns the randomly published host port.
+# Example: http://localhost:<novnc_port>/vnc.html
 ```
 
 ```mermaid
@@ -30,8 +31,8 @@ sequenceDiagram
     participant API as Backend FastAPI 8080
     participant SM as SessionManager
     participant DB as PostgreSQL
-    participant VNC as Desktop stack Xvfb x11vnc noVNC
-    participant Runner as Runner subprocess
+    participant VNC as Desktop container (Xvfb x11vnc noVNC)
+    participant Runner as Runner (inside desktop container)
     participant Claude as Anthropic API
 
     Note over User,Claude: 1 Load UI
@@ -44,15 +45,15 @@ sequenceDiagram
     User->>Browser: New Session
     Browser->>API: POST /sessions
     API->>SM: start_session_infra
-    SM->>VNC: start Xvfb WM x11vnc novnc_proxy
-    VNC-->>SM: display_num novnc_port vnc_port
+    SM->>VNC: docker run new desktop container
+    VNC-->>SM: novnc_port (published host port)
     API->>DB: INSERT AgentSession
     DB-->>API: ok
     API-->>Browser: session_id and ports
 
     Note over User,Claude: 3 Live desktop
     Browser->>VNC: iframe GET vnc.html on host novnc_port
-    Note right of VNC: Host ports 6080-6089 mapped to backend not via FastAPI
+    Note right of VNC: Host port is dynamically published per container
 
     Note over User,Claude: 4 History and SSE
     Browser->>API: GET /sessions/id/messages
@@ -74,8 +75,8 @@ sequenceDiagram
     Runner->>Claude: messages plus tools
     Claude-->>Runner: tool_use or text
     loop Tool calls
-        Runner->>VNC: xdotool GUI bash on DISPLAY
-        Runner-->>API: JSON lines on stdout stderr
+        Runner->>VNC: xdotool GUI bash on DISPLAY (inside same container)
+        Runner-->>API: JSON lines streamed back via docker exec
         API->>API: enqueue line
         API-->>Browser: SSE data
     end

@@ -52,8 +52,9 @@ async def create_session(db: AsyncSession = Depends(get_db)):
 
     sess = AgentSession(
         id=session_id,
-        display_num=info["display_num"],
+        display_num=1,
         novnc_port=info["novnc_port"],
+        container_id=info["container_id"],
         status="running",
     )
     db.add(sess)
@@ -133,12 +134,24 @@ async def send_message(
         return JSONResponse(status_code=404, content={"error": "Session not found"})
 
     env = os.environ.copy()
-    env["DISPLAY_NUM"] = str(sess.display_num)
-    env["DISPLAY"] = f":{sess.display_num}"
+    # Runner executes inside the session container (its own DISPLAY/Xvfb).
+    env["DISPLAY_NUM"] = "1"
+    env["DISPLAY"] = ":1"
     env["WIDTH"] = os.environ.get("WIDTH", "1024")
     env["HEIGHT"] = os.environ.get("HEIGHT", "768")
     # Always forward the API key explicitly so the subprocess has it (including .env-loaded values)
     env["ANTHROPIC_API_KEY"] = os.environ.get("ANTHROPIC_API_KEY", "")
+    env["DATABASE_URL"] = os.environ.get("DATABASE_URL", "")
+    if os.environ.get("MODEL"):
+        env["MODEL"] = os.environ["MODEL"]
+    if os.environ.get("API_PROVIDER"):
+        env["API_PROVIDER"] = os.environ["API_PROVIDER"]
+    if os.environ.get("TOOL_VERSION"):
+        env["TOOL_VERSION"] = os.environ["TOOL_VERSION"]
+    if os.environ.get("MAX_TOKENS"):
+        env["MAX_TOKENS"] = os.environ["MAX_TOKENS"]
+    if os.environ.get("ONLY_N_IMAGES"):
+        env["ONLY_N_IMAGES"] = os.environ["ONLY_N_IMAGES"]
 
     # 3. Spawn runner as a background task so the HTTP response returns immediately
     asyncio.create_task(_run_agent(session_id, env))
@@ -147,7 +160,7 @@ async def send_message(
 
 
 async def _run_agent(session_id: str, env: dict):
-    """Spawn runner.py in a subprocess, forward its JSON-line output to the session queue."""
+    """Execute runner in the session container; forward JSON-line output to the session queue."""
     queue = session_manager.get_queue(session_id)
 
     await queue.put(
@@ -159,25 +172,10 @@ async def _run_agent(session_id: str, env: dict):
         )
     )
 
-    process = await asyncio.create_subprocess_exec(
-        "python",
-        "-m",
-        "computer_use_demo.runner",
-        session_id,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env,
-        limit=10 * 1024 * 1024,  # 10 MB — screenshots are large base64 blobs
-    )
-
-    async def _forward(stream):
-        async for raw_line in stream:
-            line = raw_line.decode("utf-8", errors="replace").strip()
-            if line:
-                await queue.put(line)
-
-    await asyncio.gather(_forward(process.stdout), _forward(process.stderr))
-    await process.wait()
+    try:
+        await session_manager.exec_runner(session_id=session_id, env=env)
+    except Exception as exc:
+        await queue.put(json.dumps({"type": "error", "data": {"error": str(exc)}}))
 
     await queue.put(
         json.dumps(

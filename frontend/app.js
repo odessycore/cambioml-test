@@ -31,20 +31,6 @@ async function fetchSessions() {
 
 function renderSessions(sessions) {
     elements.sessionList.innerHTML = '';
-    sessions.forEach(s => {
-        const btn = document.createElement('button');
-        btn.className = `w-full text-left px-3 py-2 text-sm rounded flex items-center gap-2 transition-all ${
-            s.id === activeSessionId 
-            ? 'bg-indigo-600 text-white shadow-md' 
-            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-        }`;
-        btn.innerHTML = `
-            <div class="w-2 h-2 rounded-full ${s.status === 'running' ? 'bg-emerald-400' : 'bg-slate-500'}"></div>
-            <span class="truncate">Session ${s.id.substring(0, 6)}</span>
-        `;
-        btn.onclick = () => loadSession(s.id, s.novnc_port);
-        elements.sessionList.appendChild(btn);
-    });
 }
 
 function addChatMessage(role, text) {

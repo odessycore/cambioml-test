@@ -21,6 +21,7 @@ const elements = {
 
 async function fetchSessions() {
     try {
+        console.log("here");
         const res = await fetch(`${API_URL}/sessions`);
         const sessions = await res.json();
         renderSessions(sessions);

@@ -16,7 +16,6 @@ const elements = {
     chatForm: document.getElementById('chatForm'),
     taskInput: document.getElementById('taskInput'),
     sendBtn: document.getElementById('sendBtn'),
-    activeSessionBar: document.getElementById('activeSessionBar')
 };
 
 async function fetchSessions() {
